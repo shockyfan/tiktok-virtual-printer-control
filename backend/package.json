@@ -1,0 +1,17 @@
+{
+  "name": "tiktokapi",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "debug": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.17.3",
+    "fetch": "^1.1.0",
+    "node-fetch": "^3.2.2"
+  }
+}
