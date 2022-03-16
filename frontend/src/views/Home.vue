@@ -1,0 +1,981 @@
+<template>
+  <div>
+    <div class="scene">
+      <div class="printer">
+        <div class="printer__side printer__side--left">
+          <div class="cuboid cuboid--side">
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+          </div>
+        </div>
+        <div class="printer__side printer__side--right">
+          <div class="cuboid cuboid--side">
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side">
+              <div class="light progress-light"></div>
+              <div class="light standby-light"></div>
+              <button class="print-button">
+                <div class="button">
+                  <div class="cuboid cuboid--button">
+                    <div class="cuboid__side"></div>
+                    <div class="cuboid__side"></div>
+                    <div class="cuboid__side"></div>
+                    <div class="cuboid__side"></div>
+                    <div class="cuboid__side"></div>
+                    <div class="cuboid__side"></div>
+                  </div>
+                </div>
+              </button>
+            </div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+          </div>
+        </div>
+        <div class="printer__tray printer__tray--bottom">
+          <div class="cuboid cuboid--tray">
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+          </div>
+        </div>
+        <div class="printer__tray printer__tray--top">
+          <div class="cuboid cuboid--tray">
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+          </div>
+        </div>
+        <div class="printer__top">
+          <div class="cuboid cuboid--top">
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side">
+              <div class="screen">
+                <div class="screen__preview">
+                  <!-- <img class="screen__preview-img" /> -->
+                </div>
+              </div>
+            </div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+          </div>
+        </div>
+        <div class="printer__back">
+          <div class="cuboid cuboid--back">
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+          </div>
+        </div>
+        <div class="paper-stack paper-stack--bottom">
+          <div class="cuboid cuboid--paper">
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+          </div>
+        </div>
+        <div class="paper-stack paper-stack--top">
+          <div class="cuboid cuboid--paper">
+            <div class="cuboid__side">
+              <div class="paper">
+                <div class="paper__flyer"></div>
+              </div>
+            </div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+            <div class="cuboid__side"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <form class="customer-form">
+      <!-- <label for="print">Print URL</label> -->
+      <!-- <input
+        v-model="urlInput"
+        id="print"
+        type="url"
+        placeholder="URL for Printing"
+      /> -->
+      <span style="white-space: nowrap; font-size: 27px">
+        AUTOMATIC VIRTUAL PRINTER CONTROL
+      </span>
+      <button @click="print">PRINT HERE</button>
+    </form>
+  </div>
+</template>
+
+<script>
+import { io } from "socket.io-client";
+
+console.log("this is a test");
+export default {
+  data() {
+    return {
+      urlInput: null,
+      // file: null,
+      preview: null,
+      printer: null,
+      printingQueue: Promise.resolve(),
+      queueLength: 0,
+      queueDone: 0,
+      audio: new Audio("https://assets.codepen.io/605876/print.mp3"),
+      userNo: 0,
+      socket: null,
+      active: true,
+    };
+  },
+  mounted() {
+    console.log("mounted");
+
+    this.preview = document.querySelector("img.screen__preview-img");
+    this.printer = document.querySelector(".printer");
+    this.socket = io();
+    // this.socket = io('192.168.178.98');
+
+    // this.socket.on("connect", () => {
+    //   console.log(this.socket.connected); // true
+    //   const engine = this.socket.io.engine;
+    //   engine.on("packet", ({ type, data }) => {
+    //     console.log("got data", type);
+    //     console.log(data);
+    //     // if (type === message) {
+    //     //   this.print(message);
+    //     // }
+    //     // if (type === "follow") {
+    //     //   this.print(message);
+    //     // }
+    //     console.log(data);
+    //     // called for each packet received
+    //   });
+    // });
+
+    if (!this.active) {
+      return;
+    }
+
+    this.socket.on("chat", ({ message, nickname, comment }) => {
+      // console.log(message, nickname, comment);
+      this.print(message);
+    });
+
+    this.socket.on("follow", ({ message, nickname, isFollow }) => {
+      // console.log(message, isFollow, nickname);
+      this.print(message);
+    });
+  },
+  methods: {
+    async print(message) {
+      this.queueLength++;
+      if (!this.active) {
+        message = `User758942758924752${this.userNo}`;
+        this.userNo++;
+      }
+      const length = this.queueLength;
+      // if (!this.printingQueue) {
+      //   this.printingQueue = Promise.resolve;
+      // }
+      // if (printing) return;
+      // printing = true;
+      // SUBMIT.disabled = true;
+      // const res = await fetch(this.urlInput);
+      // this.preview.src = res.url;
+      // URL_INPUT.value = "";
+
+      // this.preview.addEventListener("load", (e) => {
+      // setTimeout(() => AUDIO.play(), 1000);
+
+      this.printingQueue = this.printingQueue.then(() => {
+        return new Promise((resolve, reject) => {
+          this.printer.classList.add("printing");
+          const print = document.createElement("div");
+          print.className = "printed";
+          print.style.cssText = `
+z-index: ${length};
+`;
+          print.innerHTML = `
+    <div class="printed__spinner">
+      <div class="printed__paper">
+        <div style="font-size: 27px" class="printed__papiere">
+        <span style="max-width: 180px; display: block; word-break: break-all;">
+          ${message}
+        </span>
+        </div>
+      </div>
+      <div class="printed__paper-back"></div>
+    </div>
+  `;
+          this.printer.prepend(print);
+          setTimeout(() => {
+            // printing = false;
+            // SUBMIT.removeAttribute("disabled");
+            this.printer.classList.remove("printing");
+            setTimeout(() => {
+              this.queueDone++;
+              console.log(
+                `Currently done: ${this.queueDone}/${this.queueLength}`
+              );
+              resolve();
+            }, 1000);
+          }, 3500);
+        });
+      });
+
+      // });
+    },
+  },
+};
+</script>
+
+<style>
+@import url("https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap");
+.cuboid {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+.cuboid__side:nth-of-type(1) {
+  height: calc(var(--thickness) * 1vmin);
+  width: 100%;
+  position: absolute;
+  top: 0;
+  transform: translate(0, -50%) rotateX(90deg);
+}
+.cuboid__side:nth-of-type(2) {
+  height: 100%;
+  width: calc(var(--thickness) * 1vmin);
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translate(50%, -50%) rotateY(90deg);
+}
+.cuboid__side:nth-of-type(3) {
+  width: 100%;
+  height: calc(var(--thickness) * 1vmin);
+  position: absolute;
+  bottom: 0;
+  transform: translate(0%, 50%) rotateX(90deg);
+}
+.cuboid__side:nth-of-type(4) {
+  height: 100%;
+  width: calc(var(--thickness) * 1vmin);
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translate(-50%, -50%) rotateY(90deg);
+}
+.cuboid__side:nth-of-type(5) {
+  height: 100%;
+  width: 100%;
+  transform: translate3d(0, 0, calc(var(--thickness) * 0.5vmin));
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.cuboid__side:nth-of-type(6) {
+  height: 100%;
+  width: 100%;
+  transform: translate3d(0, 0, calc(var(--thickness) * -0.5vmin))
+    rotateY(180deg);
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+*,
+*:after,
+*:before {
+  box-sizing: border-box;
+  transform-style: preserve-3d;
+  touch-action: none;
+}
+:root {
+  --base-size: 19;
+  --depth: calc(var(--base-size) * 2.25);
+  --height: calc(var(--base-size) * 1vmin);
+  --width: calc(var(--base-size) * 1.4vmin);
+  --base-hue: 206;
+  --accent-hue: 35;
+  --bg: hsl(276 20% 74%);
+  --shoot-speed: 1.5;
+  --load-speed: 2;
+  --print-speed: 1;
+  --p-1: hsl(var(--base-hue), 30%, 90%);
+  --p-2: hsl(var(--base-hue), 30%, 86%);
+  --p-3: hsl(var(--base-hue), 30%, 82%);
+  --p-4: hsl(var(--base-hue), 30%, 78%);
+  --p-5: hsl(var(--base-hue), 30%, 72%);
+  --p-6: hsl(var(--base-hue), 30%, 68%);
+  --p-7: hsl(var(--base-hue), 30%, 64%);
+  --p-8: hsl(var(--base-hue), 30%, 20%);
+  --t-1: #666;
+  --t-2: #5c5c5c;
+  --t-3: #525252;
+  --t-4: #474747;
+  --t-5: #3d3d3d;
+  --g-1: hsl(var(--base-hue), 40%, 94%);
+  --g-2: hsl(var(--base-hue), 40%, 90%);
+  --g-3: hsl(var(--base-hue), 40%, 86%);
+  --g-4: hsl(var(--base-hue), 40%, 80%);
+  --g-5: hsl(var(--base-hue), 40%, 96%);
+  --a-1: hsl(var(--accent-hue), 10%, 65%);
+  --a-2: hsl(var(--accent-hue), 10%, 60%);
+  --a-3: hsl(var(--accent-hue), 10%, 55%);
+  --a-4: hsl(var(--accent-hue), 10%, 50%);
+  --a-5: hsl(var(--accent-hue), 10%, 45%);
+}
+body {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  overflow: hidden;
+  touch-action: none;
+}
+.light {
+  height: calc(var(--height) * 0.1);
+  width: calc(var(--height) * 0.1);
+  position: absolute;
+  left: 50%;
+  top: 20%;
+  border-radius: 0%;
+  border: calc(var(--height) * 0.01) solid var(--p-8);
+}
+.standby-light {
+  background: #1466b8;
+  transform: translate(-50%, 0) translate(100%, 0);
+}
+.progress-light {
+  transform: translate(-50%, 0) translate(-100%, 0);
+  background: hsla(var(--progress-hue, 103), 80%, 50%);
+}
+.customer-form {
+  position: fixed;
+  top: calc(var(--height) + 50%);
+  left: 50%;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transform: translate3d(-50%, 0%, 400vmin);
+}
+.customer-form > * + * {
+  margin-top: 0.75rem;
+}
+.customer-form label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+.customer-form [type="url"] {
+  padding: 1rem 2rem;
+  font-size: 1.25rem;
+  border: 4px solid #914db3;
+  border-radius: 1rem;
+  text-align: center;
+  font-family: "Fredoka One", cursive;
+  outline: transparent;
+}
+.customer-form [type="submit"] {
+  font-family: "Fredoka One", cursive;
+  outline: transparent;
+  padding: 1rem 2rem;
+  font-size: 1.25rem;
+  color: #fff;
+  width: 180px;
+  border-radius: 1rem;
+  border: 4px solid #914db3;
+  background: #a219e6;
+  transition: background 0.1s, transform 0.1s;
+  cursor: pointer;
+}
+.customer-form [type="submit"]:hover {
+  background: #8114b8;
+  transform: translate(0, -5%);
+}
+.customer-form [type="submit"]:active {
+  background: #410a5c;
+  transform: translate(0, 5%);
+}
+.customer-form [type="submit"][disabled] {
+  background: #b5abba;
+  border-color: #9c8fa3;
+  transform: translate(0, 0);
+}
+.scene {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  height: var(--height);
+  width: var(--width);
+  transform: translate3d(-50%, -50%, 100vmin);
+  transform: translate3d(-50%, -50%, 100vmin) rotateX(-24deg) rotateY(44deg)
+    rotateX(calc(var(--rotate-x, 0) * 1deg))
+    rotateY(calc(var(--rotate-y, 0) * 1deg));
+}
+.printing {
+  --progress-hue: 14;
+}
+.printer {
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  left: 50%;
+}
+.printer > * {
+  position: absolute;
+}
+.printer__top {
+  height: 40%;
+  width: 100%;
+}
+.printer__back {
+  height: 60%;
+  width: 50%;
+  bottom: 0;
+  right: 0;
+}
+.printer__side {
+  height: 60%;
+  width: 100%;
+  bottom: 0;
+}
+.printer__side--right {
+  transform: translate3d(0, 0, calc(var(--depth) * 0.375vmin));
+}
+.printer__side--left {
+  transform: translate3d(0, 0, calc(var(--depth) * -0.375vmin));
+}
+.printer__tray {
+  height: 10%;
+  width: 100%;
+}
+.printer__tray--bottom {
+  bottom: 0;
+  right: 50%;
+}
+.printer__tray--top {
+  top: 0;
+  right: 0;
+  transform: translate(52%, 0) rotate(-75deg);
+}
+.paper-stack {
+  width: 90%;
+  bottom: 0;
+  left: -10%;
+  transform: translate3d(0, 0, calc(var(--depth) * 1vmin));
+}
+.paper-stack--bottom {
+  height: 10%;
+}
+.paper-stack--top {
+  height: 5%;
+  bottom: 10%;
+  transform: translate3d(0, 0, calc(var(--depth) * 1vmin)) rotateY(22deg);
+}
+.printed {
+  position: absolute;
+  right: 55%;
+  width: calc(var(--width) * 0.9);
+  height: calc(var(--depth) * 0.4vmin);
+  bottom: 10%;
+  transform: translate3d(0, -1px, 0);
+}
+.printed__spinner {
+  width: calc(var(--width) * 0.9);
+  height: calc(var(--depth) * 0.4vmin);
+  transform-origin: 50% 0;
+}
+.printed__paper {
+  width: calc(var(--width) * 0.9);
+  height: calc(var(--depth) * 0.4vmin);
+  bottom: 0;
+  transform: translate(0, 50%) rotateX(90deg);
+  -webkit-clip-path: inset(0 -20% 0 0);
+  clip-path: inset(0 -20% 0 0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+.printed__paper-back {
+  width: calc(var(--width) * 0.9);
+  height: calc(var(--depth) * 0.4vmin);
+  bottom: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translate(0, 50%) rotateX(90deg) rotateY(180deg);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  background: var(--g-2);
+}
+.printed__papiere {
+  background: var(--g-1);
+  position: absolute;
+  height: 100%;
+  width: 100%;
+  transform: translate(120%, 0);
+}
+.printed__image {
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  -o-object-fit: cover;
+  object-fit: cover;
+}
+.paper-preview {
+  height: calc(var(--height) * 0.5);
+  width: calc(var(--height) * 0.5);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(90deg);
+  overflow: hidden;
+}
+.paper-preview__previews {
+  height: 100%;
+  width: 100%;
+  opacity: 0;
+  display: flex;
+  flex-direction: column;
+  -webkit-animation: choose 0.1s infinite steps(5);
+  animation: choose 0.1s infinite steps(5);
+}
+.paper-preview__previews img {
+  height: 100%;
+  width: 100%;
+  -o-object-fit: cover;
+  object-fit: cover;
+}
+.paper-stack--top .cuboid--paper > div:nth-of-type(1) {
+  background: var(--g-1);
+}
+.paper-stack--top .cuboid--paper > div:nth-of-type(2) {
+  background: var(--g-1);
+}
+.paper-stack--top .cuboid--paper > div:nth-of-type(3) {
+  background: var(--g-4);
+}
+.paper-stack--top .cuboid--paper > div:nth-of-type(4) {
+  background: var(--g-2);
+}
+.paper-stack--top .cuboid--paper > div:nth-of-type(5) {
+  background: var(--g-3);
+}
+.paper-stack--top .cuboid--paper > div:nth-of-type(6) {
+  background: var(--g-3);
+}
+.paper-stack--top .cuboid--paper .paper {
+  height: 100%;
+  width: 100%;
+  background: transparent;
+}
+.paper-stack--top .cuboid--paper .paper__flyer {
+  position: absolute;
+  height: 100%;
+  width: 100%;
+  top: 0;
+  left: 0;
+  background: transparent;
+  overflow: hidden;
+}
+.paper-stack--top .cuboid--paper .paper__flyer:after {
+  content: "";
+  position: absolute;
+  height: 100%;
+  width: 100%;
+  background: var(--g-1);
+}
+.printing .paper-stack--top .cuboid--paper .paper {
+  -webkit-animation: transfer calc(var(--load-speed) * 0.5s) ease-in-out
+    forwards;
+  animation: transfer calc(var(--load-speed) * 0.5s) ease-in-out forwards;
+}
+.printing .paper-stack--top .cuboid--paper .paper__flyer {
+  -webkit-animation: fly calc(var(--load-speed) * 0.5s) ease-in-out forwards;
+  animation: fly calc(var(--load-speed) * 0.5s) ease-in-out forwards;
+}
+.printing .paper-stack--top .cuboid--paper .paper__flyer:after {
+  -webkit-animation: feed calc(var(--load-speed) * 0.5s)
+    calc(var(--load-speed) * 0.5s) forwards;
+  animation: feed calc(var(--load-speed) * 0.5s) calc(var(--load-speed) * 0.5s)
+    forwards;
+}
+.printed {
+  -webkit-animation: shoot calc(var(--shoot-speed) * 1s)
+    calc(((var(--load-speed) * 0.75) + var(--print-speed)) * 1s) ease-out
+    forwards;
+  animation: shoot calc(var(--shoot-speed) * 1s)
+    calc(((var(--load-speed) * 0.75) + var(--print-speed)) * 1s) ease-out
+    forwards;
+}
+.printed__spinner {
+  -webkit-animation: eject calc(var(--shoot-speed) * 1s)
+    calc(((var(--load-speed) * 0.75) + var(--print-speed)) * 1s) ease-out
+    forwards;
+  animation: eject calc(var(--shoot-speed) * 1s)
+    calc(((var(--load-speed) * 0.75) + var(--print-speed)) * 1s) ease-out
+    forwards;
+}
+.printed__papiere {
+  -webkit-animation: print calc(var(--print-speed) * 1s)
+    calc(var(--load-speed) * 0.75s) forwards steps(5, start);
+  animation: print calc(var(--print-speed) * 1s) calc(var(--load-speed) * 0.75s)
+    forwards steps(5, start);
+}
+.cuboid--paper {
+  --thickness: calc(var(--depth) * 0.4);
+}
+.cuboid--paper div:nth-of-type(1) {
+  background: var(--g-2);
+}
+.cuboid--paper div:nth-of-type(2) {
+  background: var(--g-2);
+}
+.cuboid--paper div:nth-of-type(3) {
+  background: var(--g-5);
+}
+.cuboid--paper div:nth-of-type(4) {
+  background: var(--g-3);
+}
+.cuboid--paper div:nth-of-type(5) {
+  background: var(--g-4);
+}
+.cuboid--paper div:nth-of-type(6) {
+  background: var(--g-4);
+}
+.print-button {
+  position: absolute;
+  top: 60%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  height: 44px;
+  width: 44px;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  border: 0;
+  background: 0;
+  padding: 0;
+  margin: 0;
+  outline: transparent;
+  cursor: pointer;
+}
+.button {
+  height: calc(var(--height) * 0.14);
+  width: calc(var(--height) * 0.14);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate3d(-50%, -50%, 0);
+}
+.print-button:active .button {
+  transform: translate3d(-50%, -50%, calc(var(--height) * 0.05));
+}
+.cuboid--button {
+  --thickness: calc(var(--base-size) * 0.12);
+}
+.cuboid--button div:nth-of-type(1) {
+  background: var(--a-1);
+}
+.cuboid--button div:nth-of-type(2) {
+  background: var(--a-1);
+}
+.cuboid--button div:nth-of-type(3) {
+  background: var(--a-4);
+}
+.cuboid--button div:nth-of-type(4) {
+  background: var(--a-5);
+}
+.cuboid--button div:nth-of-type(5) {
+  background: var(--a-3);
+}
+.cuboid--button div:nth-of-type(6) {
+  background: var(--a-3);
+}
+.screen {
+  height: calc(var(--height) * 0.25);
+  width: calc(var(--height) * 0.35);
+  left: 0;
+  top: 50%;
+  background: #c6d6e7;
+  position: absolute;
+  transform: translate3d(28%, -50%, -1px);
+  outline: calc(var(--height) * 0.01) solid var(--p-8);
+}
+.screen__preview {
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotateY(180deg);
+  overflow: hidden;
+}
+.screen__preview img {
+  height: 100%;
+  width: 100%;
+  background-size: cover;
+}
+.cuboid--top {
+  --thickness: var(--depth);
+}
+.cuboid--top > div:nth-of-type(1) {
+  background: linear-gradient(#292929, #292929) 100% 50%/14% 54% no-repeat,
+    linear-gradient(var(--p-7), var(--p-7)) 40% 50%/12% 32% no-repeat,
+    linear-gradient(var(--p-7), var(--p-7)) 30% 50%/2% 12% no-repeat,
+    linear-gradient(var(--p-3), var(--p-3)) 0% 50%/66% 50% no-repeat;
+  background-color: var(--p-1);
+}
+.cuboid--top > div:nth-of-type(1):after {
+  content: "";
+  position: absolute;
+  top: 7%;
+  left: 10%;
+  height: calc(var(--depth) * 0.12vmin);
+  width: calc(var(--depth) * 0.12vmin);
+  background: url("https://assets.codepen.io/605876/avatar.png");
+  background-size: cover;
+  transform: rotate(90deg);
+  filter: grayscale(0.5);
+}
+.cuboid--top > div:nth-of-type(2) {
+  background: var(--p-1);
+}
+.cuboid--top > div:nth-of-type(3) {
+  background: var(--p-8);
+}
+.cuboid--top > div:nth-of-type(4) {
+  background: linear-gradient(var(--p-4), var(--p-4)) 50% 0%/50% 100% no-repeat;
+  background-color: var(--p-2);
+}
+.cuboid--top > div:nth-of-type(4):after {
+  content: "";
+  position: absolute;
+  top: 25%;
+  left: 50%;
+  height: 15%;
+  width: 10%;
+  border-radius: 25%;
+  background: var(--p-6);
+  transform: translate3d(-50%, -50%, -1px);
+}
+.cuboid--top > div:nth-of-type(5) {
+  background: var(--p-3);
+}
+.cuboid--top > div:nth-of-type(6) {
+  background: var(--p-3);
+}
+.cuboid--back {
+  --thickness: calc(var(--depth) * 0.5);
+}
+.cuboid--back div:nth-of-type(1) {
+  background: var(--p-1);
+}
+.cuboid--back div:nth-of-type(2) {
+  background: var(--t-1);
+}
+.cuboid--back div:nth-of-type(3) {
+  background: var(--p-2);
+}
+.cuboid--back div:nth-of-type(4) {
+  background: var(--t-5);
+}
+.cuboid--back div:nth-of-type(5) {
+  background: var(--p-3);
+}
+.cuboid--back div:nth-of-type(6) {
+  background: var(--p-3);
+}
+.printer__tray--top .cuboid--tray div:nth-of-type(1) {
+  background: linear-gradient(var(--t-2), var(--t-2)) 90% 50%/5% 50% no-repeat;
+  background-color: var(--t-1);
+}
+.cuboid--tray {
+  --thickness: calc(var(--depth) * 0.5);
+}
+.cuboid--tray div:nth-of-type(1) {
+  background: linear-gradient(var(--t-2), var(--t-2)) 10% 50%/5% 50% no-repeat;
+  background-color: var(--t-1);
+}
+.cuboid--tray div:nth-of-type(2) {
+  background: var(--t-1);
+}
+.cuboid--tray div:nth-of-type(3) {
+  background: var(--t-2);
+}
+.cuboid--tray div:nth-of-type(4) {
+  background: var(--t-2);
+}
+.cuboid--tray div:nth-of-type(5) {
+  background: var(--t-3);
+}
+.cuboid--tray div:nth-of-type(6) {
+  background: var(--t-3);
+}
+.cuboid--side {
+  --thickness: calc(var(--depth) * 0.25);
+}
+.cuboid--side > div:nth-of-type(1) {
+  background: var(--p-1);
+}
+.cuboid--side > div:nth-of-type(2) {
+  background: var(--p-1);
+}
+.cuboid--side > div:nth-of-type(3) {
+  background: var(--p-2);
+}
+.cuboid--side > div:nth-of-type(4) {
+  background: var(--p-2);
+}
+.cuboid--side > div:nth-of-type(5) {
+  background: repeating-linear-gradient(var(--t-4) 0 25%, transparent 25% 50%)
+    90% 70%/30% 20% no-repeat;
+  background-color: var(--p-3);
+}
+.cuboid--side > div:nth-of-type(6) {
+  background: repeating-linear-gradient(var(--t-4) 0 25%, transparent 25% 50%)
+    90% 70%/30% 25% no-repeat;
+  background-color: var(--p-3);
+}
+.printer__side--left > .cuboid > div:nth-of-type(5),
+.printer__side--right > .cuboid > div:nth-of-type(6) {
+  background: var(--p-8);
+}
+@-webkit-keyframes fade {
+  0%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes fade {
+  0%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@-webkit-keyframes shoot {
+  0% {
+    transform: translate3d(0%, -1px, 0);
+  }
+  100% {
+    transform: translate3d(-300%, -1px, 0);
+  }
+}
+@keyframes shoot {
+  0% {
+    transform: translate3d(0%, -1px, 0);
+  }
+  100% {
+    transform: translate3d(-300%, -1px, 0);
+  }
+}
+@-webkit-keyframes eject {
+  15% {
+    transform: rotate(0deg);
+  }
+  50%,
+  100% {
+    transform: rotate(360deg);
+  }
+}
+@keyframes eject {
+  15% {
+    transform: rotate(0deg);
+  }
+  50%,
+  100% {
+    transform: rotate(360deg);
+  }
+}
+@-webkit-keyframes transfer {
+  to {
+    transform: translate(0, -270%) rotate(22deg);
+  }
+}
+@keyframes transfer {
+  to {
+    transform: translate(0, -270%) rotate(22deg);
+  }
+}
+@-webkit-keyframes feed {
+  to {
+    transform: translate(100%, 0);
+  }
+}
+@keyframes feed {
+  to {
+    transform: translate(100%, 0);
+  }
+}
+@-webkit-keyframes fly {
+  0% {
+    transform: translate3d(0, 0, 0) rotateY(0deg) translate(0, 0);
+  }
+  50% {
+    transform: translate3d(140%, 0, calc(var(--height) * 1.2)) rotateY(-75deg)
+      translate(180%, 0);
+  }
+  100% {
+    transform: translate3d(140%, 0, var(--height)) rotateY(-75deg)
+      translate(0%, 0) rotate(-180deg);
+  }
+}
+@keyframes fly {
+  0% {
+    transform: translate3d(0, 0, 0) rotateY(0deg) translate(0, 0);
+  }
+  50% {
+    transform: translate3d(140%, 0, calc(var(--height) * 1.2)) rotateY(-75deg)
+      translate(180%, 0);
+  }
+  100% {
+    transform: translate3d(140%, 0, var(--height)) rotateY(-75deg)
+      translate(0%, 0) rotate(-180deg);
+  }
+}
+@-webkit-keyframes print {
+  to {
+    transform: translate(0, 0);
+  }
+}
+@keyframes print {
+  to {
+    transform: translate(0, 0);
+  }
+}
+</style>

@@ -1,0 +1,6 @@
+{
+    "ignore": [
+        "./db.json",
+        "public/"
+    ]
+}
