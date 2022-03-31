@@ -65,6 +65,7 @@
             <div class="cuboid__side">
               <div class="screen">
                 <div class="screen__preview">
+                  {{ `${queueDone}/${queueLength}` }}
                   <!-- <img class="screen__preview-img" /> -->
                 </div>
               </div>
@@ -109,19 +110,6 @@
         </div>
       </div>
     </div>
-    <form class="customer-form">
-      <!-- <label for="print">Print URL</label> -->
-      <!-- <input
-        v-model="urlInput"
-        id="print"
-        type="url"
-        placeholder="URL for Printing"
-      /> -->
-      <span style="white-space: nowrap; font-size: 27px">
-        AUTOMATIC VIRTUAL PRINTER CONTROL
-      </span>
-      <button @click="print">PRINT HERE</button>
-    </form>
   </div>
 </template>
 
@@ -151,86 +139,56 @@ export default {
     this.preview = document.querySelector("img.screen__preview-img");
     this.printer = document.querySelector(".printer");
     this.socket = io();
-    // this.socket = io('192.168.178.98');
-
-    // this.socket.on("connect", () => {
-    //   console.log(this.socket.connected); // true
-    //   const engine = this.socket.io.engine;
-    //   engine.on("packet", ({ type, data }) => {
-    //     console.log("got data", type);
-    //     console.log(data);
-    //     // if (type === message) {
-    //     //   this.print(message);
-    //     // }
-    //     // if (type === "follow") {
-    //     //   this.print(message);
-    //     // }
-    //     console.log(data);
-    //     // called for each packet received
-    //   });
-    // });
 
     if (!this.active) {
       return;
     }
 
     this.socket.on("chat", ({ message, nickname, comment }) => {
-      // console.log(message, nickname, comment);
-      this.print(message);
+      this.print("chat", nickname, message);
     });
 
     this.socket.on("follow", ({ message, nickname, isFollow }) => {
+      this.print("follow", nickname, message);
+    });
+
+    this.socket.on("gift", ({ name, nickname, count }) => {
       // console.log(message, isFollow, nickname);
-      this.print(message);
+      this.print("gift", nickname, name, count);
     });
   },
   methods: {
-    async print(message) {
+    async print(type, nickname, message, count = null) {
       this.queueLength++;
       if (!this.active) {
         message = `User758942758924752${this.userNo}`;
         this.userNo++;
       }
       const length = this.queueLength;
-      // if (!this.printingQueue) {
-      //   this.printingQueue = Promise.resolve;
-      // }
-      // if (printing) return;
-      // printing = true;
-      // SUBMIT.disabled = true;
-      // const res = await fetch(this.urlInput);
-      // this.preview.src = res.url;
-      // URL_INPUT.value = "";
-
-      // this.preview.addEventListener("load", (e) => {
-      // setTimeout(() => AUDIO.play(), 1000);
 
       this.printingQueue = this.printingQueue.then(() => {
         return new Promise((resolve, reject) => {
           this.printer.classList.add("printing");
+
+          const html = this.getLetterHtml(type, nickname, message, count);
           const print = document.createElement("div");
           print.className = "printed";
+          print.setAttribute("id", `printed_paper_${length}`);
           print.style.cssText = `
 z-index: ${length};
 `;
-          print.innerHTML = `
-    <div class="printed__spinner">
-      <div class="printed__paper">
-        <div style="font-size: 27px" class="printed__papiere">
-        <span style="max-width: 180px; display: block; word-break: break-all;">
-          ${message}
-        </span>
-        </div>
-      </div>
-      <div class="printed__paper-back"></div>
-    </div>
-  `;
+          print.innerHTML = html;
           this.printer.prepend(print);
           setTimeout(() => {
-            // printing = false;
-            // SUBMIT.removeAttribute("disabled");
             this.printer.classList.remove("printing");
             setTimeout(() => {
+              const element = document.getElementById(
+                `printed_paper_${this.queueDone}`
+              );
+              console.log(element);
+              if (element) {
+                element.remove();
+              }
               this.queueDone++;
               console.log(
                 `Currently done: ${this.queueDone}/${this.queueLength}`
@@ -240,8 +198,45 @@ z-index: ${length};
           }, 3500);
         });
       });
+    },
+    getLetterHtml(type, nickname, message, count) {
+      let innerHtml = null;
+      if (type === "follow") {
+        innerHtml = `<span style="display: flex; justify-content: center; font-weight: 600;">
+           ❤️Follow
+          </span>
+          <span style="max-width: 180px; display: block; word-break: break-all;">
+             ${nickname}
+          </span>`;
+      }
+      if (type === "chat") {
+        innerHtml = `<span style="display: flex; justify-content: center; font-weight: 600;">
+            ${message} 👋
+          </span>
+          <span style="max-width: 180px; display: block; word-break: break-all;">
+             ${nickname}
+          </span>`;
+      }
+      if (type === "gift") {
+        innerHtml = `<span style="display: flex; justify-content: center; font-weight: 600;">
+           ${count}x ${message}
+          </span>
+          <span style="max-width: 180px; display: block; word-break: break-all;">
+             ${nickname}
+          </span>`;
+      }
 
-      // });
+      const template = `
+    <div class="printed__spinner">
+      <div class="printed__paper">
+        <div style="font-size: 20px" class="printed__papiere">
+          ${innerHtml}
+        </div>
+      </div>
+      <div class="printed__paper-back"></div>
+    </div>
+  `;
+      return template;
     },
   },
 };
@@ -430,7 +425,7 @@ body {
 }
 .scene {
   position: fixed;
-  top: 50%;
+  top: 10%;
   left: 50%;
   height: var(--height);
   width: var(--width);
@@ -732,6 +727,10 @@ body {
   outline: calc(var(--height) * 0.01) solid var(--p-8);
 }
 .screen__preview {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   height: 100%;
   width: 100%;
   position: absolute;
@@ -755,7 +754,7 @@ body {
     linear-gradient(var(--p-3), var(--p-3)) 0% 50%/66% 50% no-repeat;
   background-color: var(--p-1);
 }
-.cuboid--top > div:nth-of-type(1):after {
+/* .cuboid--top > div:nth-of-type(1):after {
   content: "";
   position: absolute;
   top: 7%;
@@ -766,7 +765,7 @@ body {
   background-size: cover;
   transform: rotate(90deg);
   filter: grayscale(0.5);
-}
+} */
 .cuboid--top > div:nth-of-type(2) {
   background: var(--p-1);
 }
